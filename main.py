@@ -24,90 +24,96 @@
 """
 #Код программы
 
-import sys
-import time
-from collections import defaultdict
-
-
-def load_dictionary(filepath):
-    """
-    Загружает словарь из файла в кодировке UTF-8.
-    Возвращает список слов.
-    """
+def read_dictionary(file_path):
+    """Читает словарь из файла и возвращает список слов."""
     try:
-        with open(filepath, 'r', encoding='utf-8') as f:
-            words = [line.strip().lower() for line in f if line.strip()]
+        with open(file_path, 'r', encoding='utf-8') as file:
+            # Читаем все строки, удаляем лишние пробелы и пустые строки
+            words = [line.strip() for line in file if line.strip()]
         return words
     except FileNotFoundError:
-        print(f"Ошибка: файл {filepath} не найден.")
-        sys.exit(1)
+        print(f"Ошибка: файл {file_path} не найден.")
+        return []
     except Exception as e:
         print(f"Ошибка при чтении файла: {e}")
-        sys.exit(1)
+        return []
 
 
-def build_index(words):
-    """
-    Строит индекс: для каждой сигнатуры (отсортированные буквы)
-    хранит список слов, которые можно из них составить.
-    """
-    index = defaultdict(list)
-    for word in words:
-        signature = tuple(sorted(word))
-        index[signature].append(word)
-    return index
+def count_letters(word):
+    """Подсчитывает количество каждой буквы в слове."""
+    letter_count = {}
+    for char in word:
+        letter_count[char] = letter_count.get(char, 0) + 1
+    return letter_count
 
 
-def find_words_by_letters(letters, index):
+def can_form_word(target_word, dict_word):
     """
-    Находит все слова из индекса, которые можно составить из заданных букв.
-    Возвращает список слов, отсортированный по убыванию длины.
+    Проверяет, можно ли составить dict_word из букв target_word.
+    Возвращает True, если можно, иначе False.
     """
-    signature = tuple(sorted(letters.lower()))
-    return sorted(index.get(signature, []), key=lambda w: (-len(w), w))
+    # Считаем буквы в исходном слове
+    target_counts = count_letters(target_word)
+
+    # Проверяем, хватает ли букв для составления слова из словаря
+    for char in dict_word:
+        if target_counts.get(char, 0) == 0:
+            return False
+        target_counts[char] -= 1
+
+    return True
+
+
+def find_matching_words(word, dictionary):
+    """Находит все слова из словаря, которые можно составить из букв word."""
+    result = []
+    word = word.lower()  # Приводим к нижнему регистру
+
+    for dict_word in dictionary:
+        # Пропускаем слова, которые длиннее исходного
+        if len(dict_word) > len(word):
+            continue
+
+        # Проверяем, можно ли составить слово
+        if can_form_word(word, dict_word):
+            result.append(dict_word)
+
+    # Сортируем по убыванию длины, при одинаковой длине сохраняем порядок из словаря
+    result.sort(key=lambda x: len(x), reverse=True)
+    return result
 
 
 def main():
+    # Путь к файлу со словарем
     dictionary_file = "nouns.txt"
 
     print("Загрузка словаря...")
-    start_time = time.time()
+    dictionary = read_dictionary(dictionary_file)
+    print(f"Словарь загружен. Всего слов: {len(dictionary)}")
 
-    # Загружаем словарь
-    all_words = load_dictionary(dictionary_file)
-    print(f"Загружено слов: {len(all_words)}")
-
-    # Строим индекс для быстрого поиска
-    index = build_index(all_words)
-
-    load_time = time.time() - start_time
-    print(f"Инициализация завершена за {load_time:.2f} секунд.")
-    print("Можно выполнять поиск.\n")
-
+    # Основной цикл обработки запросов
     while True:
-        # Запрос слова у пользователя
-        user_word = input("Введите слово (или 'exit' для выхода): ").strip()
-        if user_word.lower() == 'exit':
+        print("\n" + "=" * 50)
+        word = input("Введите слово (или 'выход' для завершения): ").strip().lower()
+
+        if word == 'выход':
+            print("Программа завершена.")
             break
 
-        if not user_word:
-            print("Пожалуйста, введите слово.\n")
+        if not word:
+            print("Пожалуйста, введите слово.")
             continue
 
-        # Замер времени поиска
-        search_start = time.time()
-        results = find_words_by_letters(user_word, index)
-        search_time = time.time() - search_start
+        # Ищем подходящие слова
+        matching_words = find_matching_words(word, dictionary)
 
-        print(f"\nСлова, которые можно составить из букв слова '{user_word}':")
-        if results:
-            for word in results:
-                print(f"  {word} (длина: {len(word)})")
-            print(f"Всего найдено: {len(results)} слов.")
+        if matching_words:
+            print(f"\nНайдено слов: {len(matching_words)}")
+            print("Слова в порядке уменьшения длины:")
+            for w in matching_words:
+                print(f"  {w} (длина: {len(w)})")
         else:
-            print("Слова не найдены.")
-
-        print(f"Время поиска: {search_time:.4f} секунд.\n")
+            print(f"Не найдено слов, которые можно составить из букв слова '{word}'.")
 
 
 if __name__ == "__main__":
